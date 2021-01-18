@@ -1600,26 +1600,51 @@ var blocksNamespace = {
 };
 
 // Key: Java Banner Color | Value: Bedrock Banner Color
-var BannerColorEnum = {
-    0: 15, // white dye
-    1: 14, // orange dye
-    2: 13, // magenta dye
-    3: 12, // light blue dye
-    4: 11, // yellow dye
-    5: 10, // lime dye
-    6: 9, // pink dye
-    9: 6, // cyan dye
-    7: 8, // gray dye
-    8: 7, // light gray dye
-    10: 5, // purple dye
-    11: 4, // blue dye
-    12: 3, // brown dye
-    13: 2, // green dye
-    14: 1, // red dye
-    15: 0 // black dye
+var BannerColorJavaToBedrock = {
+    0: 15, // white
+    1: 14, // orange
+    2: 13, // magenta
+    3: 12, // light blue
+    4: 11, // yellow
+    5: 10, // lime
+    6: 9, // pink
+    9: 6, // cyan
+    7: 8, // gray
+    8: 7, // light gray
+    10: 5, // purple
+    11: 4, // blue
+    12: 3, // brown
+    13: 2, // green
+    14: 1, // red
+    15: 0 // black
+};
+
+var BannerColorSidToBedrockID = {
+    'minecraft:white_banner': 15, // white
+    'minecraft:orange_banner': 14, // orange
+    'minecraft:magenta_banner': 13, // magenta
+    'minecraft:Light_blight_blue_banner': 12, // light blue
+    'minecraft:yellow_banner': 11, // yellow
+    'minecraft:lime_banner': 10, // lime
+    'minecraft:pink_banner': 9, // pink
+    'minecraft:cyan_banner': 6, // cyan
+    'minecraft:gray_banner': 8, // gray
+    'minecraft:light_gray_banner': 7, // light gray
+    'minecraft:purple_banner': 5, // purple
+    'minecraft:blue_banner': 4, // blue
+    'minecraft:brown_banner': 3, // brown
+    'minecraft:green_banner': 2, // green
+    'minecraft:red_banner': 1, // red
+    'minecraft:black_banner': 0 // black
 };
 
 function schemtoschematic(arrayBuffer, callback) {
+    function getKeyByValue(object, value) {
+        return Object.keys(object).find((key) => {
+            return object[key].value === value;
+        });
+    }
+
     // Move the schematic offset data to the old location
     function moveOffset(root) {
         if ('Metadata' in root.value) {
@@ -1657,7 +1682,7 @@ function schemtoschematic(arrayBuffer, callback) {
     }
 
     // Move the tile entites to the old location and modify their position and id data
-    function moveTileEntities(root) {
+    function moveTileEntities(root, oldRoot) {
         if ('BlockEntities' in root.value) {
             root.value.TileEntities = root.value.BlockEntities;
             delete root.value.BlockEntities;
@@ -1687,11 +1712,38 @@ function schemtoschematic(arrayBuffer, callback) {
                         tileEntity.id.value =
                             tileEntity.id.value.charAt(0).toUpperCase() +
                             tileEntity.id.value.slice(1);
+
+                        if (tileEntity.id.value === 'Banner') {
+                            // const index = x + z * MaxX + y * MaxX * MaxY;
+                            const index =
+                                tileEntity.x.value +
+                                tileEntity.z.value * oldRoot.value.Width.value +
+                                tileEntity.y.value *
+                                    oldRoot.value.Width.value *
+                                    oldRoot.value.Height.value;
+
+                            const patternIndex =
+                                oldRoot.value.BlockData.value[index];
+
+                            let val = getKeyByValue(
+                                oldRoot.value.Palette.value,
+                                patternIndex
+                            );
+
+                            tileEntity.Base = {
+                                type: 'int',
+                                value:
+                                    BannerColorSidToBedrockID[val.split('[')[0]]
+                            };
+                        }
+
                         if (tileEntity.Patterns)
                             for (let pattern of tileEntity.Patterns.value
                                 .value) {
                                 pattern.Color.value =
-                                    BannerColorEnum[pattern.Color.value];
+                                    BannerColorJavaToBedrock[
+                                        pattern.Color.value
+                                    ];
                             }
                     }
 
@@ -2049,11 +2101,12 @@ function schemtoschematic(arrayBuffer, callback) {
         if (error) {
             throw error;
         }
+        const oldRoot = root;
 
         moveOffset(root);
         moveOrigin(root);
         setMaterials(root);
-        moveTileEntities(root);
+        moveTileEntities(root, oldRoot);
         convertBlockData(root);
         console.log(root);
 
